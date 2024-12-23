@@ -1,5 +1,2 @@
-pyTelegramBotAPI==4.12.0
-instagrapi==1.10.2
-pyshorteners==1.0.1
-python-dotenv==1.0.0
-Pillow>=8.1.1
+instaloader==4.10.1
+python-telegram-bot==20.0
