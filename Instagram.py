@@ -1,11 +1,11 @@
 import os
 import instaloader
 from telegram import Update
-from telegram.ext import Updater, CommandHandler, MessageHandler, CallbackContext
+from telegram.ext import Application, CommandHandler, MessageHandler, CallbackContext
 from telegram.ext import filters
 
 # Telegram Bot Token
-TELEGRAM_TOKEN = "7080362550:AAEgjuX2RQ-4T0OoZAFeFQrtl6pB110cTGA"
+TELEGRAM_TOKEN = "your_telegram_bot_token"
 
 # Create an instance of Instaloader
 L = instaloader.Instaloader()
@@ -53,30 +53,28 @@ def download_story(url: str, chat_id: int, context: CallbackContext):
         return f"Failed to download story: {e}"
 
 # Start command for the Telegram bot
-def start(update: Update, context: CallbackContext):
-    update.message.reply_text('Send me the Instagram story link, and I will download it for you!')
+async def start(update: Update, context: CallbackContext):
+    await update.message.reply_text('Send me the Instagram story link, and I will download it for you!')
 
 # Handle incoming links and download stories
-def handle_message(update: Update, context: CallbackContext):
+async def handle_message(update: Update, context: CallbackContext):
     url = update.message.text
     if "instagram.com" in url:
         message = download_story(url, update.message.chat_id, context)
-        update.message.reply_text(message)
+        await update.message.reply_text(message)
     else:
-        update.message.reply_text("Please send a valid Instagram story URL.")
+        await update.message.reply_text("Please send a valid Instagram story URL.")
 
 # Main function to start the bot
 def main():
-    updater = Updater(TELEGRAM_TOKEN, use_context=True)
-    dispatcher = updater.dispatcher
+    application = Application.builder().token(TELEGRAM_TOKEN).build()
 
     # Add command and message handlers
-    dispatcher.add_handler(CommandHandler('start', start))
-    dispatcher.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+    application.add_handler(CommandHandler('start', start))
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
     # Start the bot
-    updater.start_polling()
-    updater.idle()
+    application.run_polling()
 
 if __name__ == '__main__':
     main()
