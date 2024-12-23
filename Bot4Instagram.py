@@ -1,90 +1,81 @@
-import telebot
-from instagrapi import Client
-import pyshorteners
 import os
-from dotenv import load_dotenv
+import instaloader
+from telegram import Update
+from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext
 
-# Load environment variables
-load_dotenv()
-BOT_TOKEN = os.getenv("7080362550:AAEgjuX2RQ-4T0OoZAFeFQrtl6pB110cTGA")
-INSTA_USER = os.getenv("73j3")
-INSTA_PASS = os.getenv("nrkrk")
+# Telegram Bot Token
+TELEGRAM_TOKEN = "7080362550:AAEgjuX2RQ-4T0OoZAFeFQrtl6pB110cTGA"
 
-# Initialize bot and Instagram client
-bot = telebot.TeleBot(BOT_TOKEN)
-cl = Client()
-cl.login(INSTA_USER, INSTA_PASS)
-type_tiny = pyshorteners.Shortener()
+# Create an instance of Instaloader
+L = instaloader.Instaloader()
 
-# Welcome message
-@bot.message_handler(commands=['start', 'hello'])
-def send_welcome(message):
-    bot.reply_to(
-        message,
-        "Welcome!\nYou can download Instagram content (Stories, Posts, Reels, IGTV, Profile Pictures).\n\n"
-        "To get a user's profile picture, type:\n`:username`\n\n"
-        "To download media, just send the Instagram URL."
-    )
-
-# Media downloader handler
-@bot.message_handler(func=lambda msg: True)
-def download(message):
-    txt = message.text.strip()
-    res = "Unavailable link or invalid input."
-    
+# Download Instagram story from link
+def download_story(url: str, chat_id: int, context: CallbackContext):
     try:
-        # Handle Instagram URLs
-        if 'instagram.com' in txt:
-            if 'stories' in txt:
-                # Download Story
-                try:
-                    story_pk = cl.story_pk_from_url(txt)
-                    story = cl.story_info(story_pk).dict()
-                    if story.get('video_url'):
-                        res = type_tiny.tinyurl.short(story['video_url'])
-                    elif story.get('thumbnail_url'):
-                        res = type_tiny.tinyurl.short(story['thumbnail_url'])
-                except Exception:
-                    res = "Failed to download the story. Ensure the link is correct."
+        # Extract the username from the URL
+        shortcode = url.split('/')[-2]
+        
+        # Check if the URL is a valid Instagram link
+        if not shortcode:
+            return "Invalid Instagram URL!"
 
-            elif any(segment in txt for segment in ['/p/', '/tv/', '/reel/']):
-                # Download Post/Reel/IGTV
-                try:
-                    media_pk = cl.media_pk_from_url(txt)
-                    media_info = cl.media_info(media_pk).dict()
-                    media_type = media_info.get('media_type')
-                    
-                    if media_type == 2:  # Video
-                        res = type_tiny.tinyurl.short(media_info['video_url'])
-                    elif media_type == 1:  # Image
-                        res = type_tiny.tinyurl.short(media_info['thumbnail_url'])
-                    elif media_type == 8:  # Album
-                        res = "Album content:\n"
-                        for item in media_info['resources']:
-                            url = item.get('video_url') or item.get('thumbnail_url')
-                            if url:
-                                res += type_tiny.tinyurl.short(url) + "\n"
-                except Exception:
-                    res = "Failed to download the media. Ensure the link is correct."
+        # Try to load the profile
+        profile = instaloader.Profile.from_username(L.context, shortcode)
+        
+        # Download all stories of the profile
+        stories = L.get_stories(userids=[profile.userid])
+        download_path = f"downloads/{profile.username}"
+        
+        # Make a folder to store the downloaded content
+        os.makedirs(download_path, exist_ok=True)
 
-        # Handle profile picture download
-        elif txt.startswith(':'):
-            username = txt[1:].strip()
-            try:
-                user_info = cl.user_info_by_username(username).dict()
-                res = type_tiny.tinyurl.short(user_info['profile_pic_url'])
-            except Exception:
-                res = "User not found or account is private."
+        for story in stories:
+            for item in story.get_items():
+                L.download_storyitem(item, target=download_path)
 
-        # Default error message
-        else:
-            res = "Invalid input. Please send a valid Instagram URL or `:username`."
-    
+        # Send success message to Telegram chat
+        message = "The story has been successfully downloaded."
+        
+        # Send the story as a file
+        for story_file in os.listdir(download_path):
+            if story_file.endswith('.mp4') or story_file.endswith('.jpg'):
+                with open(f'{download_path}/{story_file}', 'rb') as f:
+                    context.bot.send_document(chat_id=chat_id, document=f)
+
+        # Clean up downloaded files
+        for story_file in os.listdir(download_path):
+            os.remove(f'{download_path}/{story_file}')
+        os.rmdir(download_path)
+        
+        return message
     except Exception as e:
-        res = f"An error occurred: {str(e)}"
+        return f"Failed to download story: {e}"
 
-    # Send the result
-    bot.send_message(chat_id=message.chat.id, text=res)
+# Start command for the Telegram bot
+def start(update: Update, context: CallbackContext):
+    update.message.reply_text('Send me the Instagram story link, and I will download it for you!')
 
-# Start polling
-bot.infinity_polling()
+# Handle incoming links and download stories
+def handle_message(update: Update, context: CallbackContext):
+    url = update.message.text
+    if "instagram.com" in url:
+        message = download_story(url, update.message.chat_id, context)
+        update.message.reply_text(message)
+    else:
+        update.message.reply_text("Please send a valid Instagram story URL.")
+
+# Main function to start the bot
+def main():
+    updater = Updater(TELEGRAM_TOKEN, use_context=True)
+    dispatcher = updater.dispatcher
+
+    # Add command and message handlers
+    dispatcher.add_handler(CommandHandler('start', start))
+    dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, handle_message))
+
+    # Start the bot
+    updater.start_polling()
+    updater.idle()
+
+if __name__ == '__main__':
+    main()
