@@ -5,7 +5,7 @@ from telegram.ext import Application, CommandHandler, MessageHandler, CallbackCo
 from telegram.ext import filters
 
 # Telegram Bot Token
-TELEGRAM_TOKEN = "your_telegram_bot_token"
+TELEGRAM_TOKEN = "7080362550:AAEgjuX2RQ-4T0OoZAFeFQrtl6pB110cTGA"
 
 # Create an instance of Instaloader
 L = instaloader.Instaloader()
