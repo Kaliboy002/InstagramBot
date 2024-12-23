@@ -7,8 +7,8 @@ from dotenv import load_dotenv
 # Load environment variables
 load_dotenv()
 BOT_TOKEN = os.getenv("7080362550:AAEgjuX2RQ-4T0OoZAFeFQrtl6pB110cTGA")
-INSTA_USER = os.getenv("mr_shokrullah")
-INSTA_PASS = os.getenv("SHM14002022SHM")
+INSTA_USER = os.getenv("73j3")
+INSTA_PASS = os.getenv("nrkrk")
 
 # Initialize bot and Instagram client
 bot = telebot.TeleBot(BOT_TOKEN)
